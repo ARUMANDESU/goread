@@ -1,6 +1,8 @@
 # goread
 A self-hosted server and web client for managing and reading e-books and manga/comics.
 
+NOTE: this is not multi-tenant sevice and users share the same library
+
 ## Features
 - **Self-Hosted**: Run the server on your own hardware or cloud service.
 - **Web Client**: Access your library from any device with a web browser.
