@@ -1,0 +1,8 @@
+version: '3'
+
+dotenv: ['.env']
+
+tasks:
+    gen-i18n:
+        cmds:
+            - go run cmd/i18n-keys-codegen/main.go --v --d ./locale --cgd ./pkg/i18nx

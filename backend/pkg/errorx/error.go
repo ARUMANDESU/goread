@@ -20,3 +20,21 @@ func (op Op) WrapMsg(err error, msg string) error {
 	}
 	return fmt.Errorf("%s: %s: %w", op, msg, err)
 }
+
+// WrapMsgf wraps error with op and message(f+args): <op>: <msg>: <err>; if err is nil, returns nil
+func (op Op) WrapMsgf(err error, f string, args ...any) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %s: %w", op, fmt.Sprintf(f, args...), err)
+}
+
+// Msg wraps message with op and returns error: <op>: <msg>
+func (op Op) Msg(msg string) error {
+	return fmt.Errorf("%s: %s", op, msg)
+}
+
+// Msgf wraps message(format + args) with op and returns error: <op>: <msg(f+args)>
+func (op Op) Msgf(f string, args ...any) error {
+	return fmt.Errorf("%s: %s", op, fmt.Sprintf(f, args...))
+}

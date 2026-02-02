@@ -4,7 +4,7 @@ import (
 	v "github.com/ARUMANDESU/validation"
 	"github.com/gofrs/uuid"
 
-	"gitlab.com/ARUMANDESU/goread/backend/pkg/errorx"
+	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
 )
 
 const (

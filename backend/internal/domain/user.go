@@ -5,11 +5,15 @@ import (
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"gitlab.com/ARUMANDESU/goread/backend/pkg/envx"
-	"gitlab.com/ARUMANDESU/goread/backend/pkg/errorx"
+	"github.com/ARUMANDESU/goread/backend/pkg/envx"
+	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
 )
 
-const PasswordCostFactor = 12
+const (
+	PasswordCostFactor = 12
+	MinUserNameLen     = 3
+	MaxUserNameLen     = 75
+)
 
 type UserID uuid.UUID
 
@@ -33,8 +37,8 @@ func NewUser(
 
 	err := v.Errors{
 		"id":       v.Validate(id, v.Required),
-		"name":     v.Validate(name, v.Required),
-		"password": v.Validate(password, v.Required),
+		"name":     v.Validate(name, v.Required, v.Length(MinUserNameLen, MaxUserNameLen)),
+		"password": v.Validate(password, v.Required, v.Length(8, 128)),
 	}.Filter()
 	if err != nil {
 		return nil, op.Wrap(err)
@@ -65,7 +69,7 @@ func NewPasswordHash(password string, mode envx.Mode) ([]byte, error) {
 	}
 	passhash, err := bcrypt.GenerateFromPassword([]byte(password), costFactor)
 	if err != nil {
-		return nil, op.WrapMsg(err, "%s: failed to generate password hash: %w")
+		return nil, op.WrapMsg(err, "failed to generate password hash")
 	}
 	return passhash, nil
 }
