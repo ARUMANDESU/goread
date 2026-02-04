@@ -14,7 +14,7 @@ const (
 	MaxAnnotationLen       = 2000
 )
 
-type LibraryItemID uuid.UUID
+type LibraryItemID = uuid.UUID
 
 type LibraryItemType string
 
@@ -35,7 +35,7 @@ type LibraryItem struct {
 }
 
 func NewLibraryItemID() LibraryItemID {
-	return LibraryItemID(uuid.Must(uuid.NewV7()))
+	return uuid.Must(uuid.NewV7())
 }
 
 func NewLibraryItem(

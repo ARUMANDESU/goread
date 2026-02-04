@@ -13,4 +13,10 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 )
 
-require golang.org/x/text v0.33.0 // indirect
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
+	golang.org/x/text v0.33.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

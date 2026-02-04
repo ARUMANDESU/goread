@@ -7,6 +7,7 @@ import (
 
 	"github.com/ARUMANDESU/goread/backend/pkg/envx"
 	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
+	vx "github.com/ARUMANDESU/goread/backend/pkg/validationx"
 )
 
 const (
@@ -15,7 +16,7 @@ const (
 	MaxUserNameLen     = 75
 )
 
-type UserID uuid.UUID
+type UserID = uuid.UUID
 
 type User struct {
 	id       UserID
@@ -24,7 +25,7 @@ type User struct {
 }
 
 func NewUserID() UserID {
-	return UserID(uuid.Must(uuid.NewV7()))
+	return uuid.Must(uuid.NewV7())
 }
 
 func NewUser(
@@ -36,9 +37,9 @@ func NewUser(
 	const op = errorx.Op("domain.NewUser")
 
 	err := v.Errors{
-		"id":       v.Validate(id, v.Required),
-		"name":     v.Validate(name, v.Required, v.Length(MinUserNameLen, MaxUserNameLen)),
-		"password": v.Validate(password, v.Required, v.Length(8, 128)),
+		"id":       v.Validate(id, vx.Required),
+		"name":     v.Validate(name, vx.Required, v.Length(MinUserNameLen, MaxUserNameLen)),
+		"password": v.Validate(password, vx.Required, v.Length(8, 128), vx.IsPasswordFromat),
 	}.Filter()
 	if err != nil {
 		return nil, op.Wrap(err)

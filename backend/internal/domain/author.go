@@ -12,7 +12,7 @@ const (
 	MaxAuthorNameLen = 100
 )
 
-type AuthorID uuid.UUID
+type AuthorID = uuid.UUID
 
 type Author struct {
 	id   AuthorID
@@ -20,7 +20,7 @@ type Author struct {
 }
 
 func NewAuthorID() AuthorID {
-	return AuthorID(uuid.Must(uuid.NewV7()))
+	return uuid.Must(uuid.NewV7())
 }
 
 func NewAuthor(
