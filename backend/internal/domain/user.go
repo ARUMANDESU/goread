@@ -14,6 +14,8 @@ const (
 	PasswordCostFactor = 12
 	MinUserNameLen     = 3
 	MaxUserNameLen     = 75
+	MinUserPasswordLen = 8
+	MaxUserPasswordLen = 128
 )
 
 type UserID = uuid.UUID
@@ -39,7 +41,7 @@ func NewUser(
 	err := v.Errors{
 		"id":       v.Validate(id, vx.Required),
 		"name":     v.Validate(name, vx.Required, v.Length(MinUserNameLen, MaxUserNameLen)),
-		"password": v.Validate(password, vx.Required, v.Length(8, 128), vx.IsPasswordFromat),
+		"password": v.Validate(password, vx.Required, vx.Password(MinUserPasswordLen, MaxUserPasswordLen)),
 	}.Filter()
 	if err != nil {
 		return nil, op.Wrap(err)

@@ -22,73 +22,118 @@ const (
 func TestNewUser(t *testing.T) {
 	t.Parallel()
 
+	type args struct {
+		id       UserID
+		username string
+		password string
+	}
+
+	validArgs := func() args {
+		return args{NewUserID(), ValidUsername, ValidPassword}
+	}
+
 	tests := []struct {
 		name        string
-		id          UserID
-		userName    string
-		password    string
+		args        func() args
 		expectedErr error
 	}{
 		{
-			name:     "valid args",
-			id:       NewUserID(),
-			password: ValidPassword,
-			userName: ValidUsername,
+			name: "valid args",
+			args: validArgs,
 		},
 		{
-			name:        "invalid id: nil",
-			id:          UserID{},
-			password:    ValidPassword,
-			userName:    ValidUsername,
+			name: "valid username: exact min length",
+			args: func() args {
+				a := validArgs()
+				a.username = usernameWithLength(MinUserNameLen)
+				return a
+			},
+		},
+		{
+			name: "valid username: exact max length",
+			args: func() args {
+				a := validArgs()
+				a.username = usernameWithLength(MaxUserNameLen)
+				return a
+			},
+		},
+		{
+			name: "invalid id: nil",
+			args: func() args {
+				a := validArgs()
+				a.id = UserID{}
+				return a
+			},
 			expectedErr: v.Errors{"id": v.ErrRequired},
 		},
 		{
-			name:        "invalid username: too short",
-			id:          NewUserID(),
-			password:    ValidPassword,
-			userName:    usernameWithLength(MinUserNameLen - 1),
+			name: "invalid username: blank",
+			args: func() args {
+				a := validArgs()
+				a.username = ""
+				return a
+			},
+			expectedErr: v.Errors{"name": v.ErrRequired},
+		},
+		{
+			name: "invalid username: too short",
+			args: func() args {
+				a := validArgs()
+				a.username = usernameWithLength(MinUserNameLen - 1)
+				return a
+			},
 			expectedErr: v.Errors{"name": v.ErrLengthOutOfRange},
 		},
 		{
-			name:        "invalid username: too long",
-			id:          NewUserID(),
-			password:    ValidPassword,
-			userName:    usernameWithLength(MaxUserNameLen + 1),
+			name: "invalid username: too long",
+			args: func() args {
+				a := validArgs()
+				a.username = usernameWithLength(MaxUserNameLen + 1)
+				return a
+			},
 			expectedErr: v.Errors{"name": v.ErrLengthOutOfRange},
 		},
 		{
-			name:        "invalid password: empty",
-			id:          NewUserID(),
-			password:    "",
-			userName:    ValidUsername,
+			name: "invalid password: blank",
+			args: func() args {
+				a := validArgs()
+				a.password = ""
+				return a
+			},
 			expectedErr: v.Errors{"password": v.ErrRequired},
 		},
 		{
-			name:        "invalid password: too short",
-			id:          NewUserID(),
-			password:    InvalidPasswordShort,
-			userName:    ValidUsername,
-			expectedErr: v.Errors{"password": v.ErrLengthOutOfRange},
-		},
-		{
-			name:        "invalid password: too long",
-			id:          NewUserID(),
-			password:    passwordWithLength(129),
-			userName:    ValidUsername,
-			expectedErr: v.Errors{"password": v.ErrLengthOutOfRange},
-		},
-		{
-			name:        "invalid password: format",
-			id:          NewUserID(),
-			password:    InvalidPasswordFormat,
-			userName:    ValidUsername,
+			name: "invalid password: too short",
+			args: func() args {
+				a := validArgs()
+				a.password = InvalidPasswordShort
+				return a
+			},
 			expectedErr: v.Errors{"password": vx.ErrInvalidPasswordFormat},
 		},
 		{
-			name:     "multiple validation errors",
-			id:       UserID{},
-			password: "",
-			userName: "",
+			name: "invalid password: too long",
+			args: func() args {
+				a := validArgs()
+				a.password = passwordWithLength(MaxUserPasswordLen + 1)
+				return a
+			},
+			expectedErr: v.Errors{"password": vx.ErrInvalidPasswordFormat},
+		},
+		{
+			name: "invalid password: format",
+			args: func() args {
+				a := validArgs()
+				a.password = InvalidPasswordFormat
+				return a
+			},
+			expectedErr: v.Errors{"password": vx.ErrInvalidPasswordFormat},
+		},
+		{
+			name: "multiple validation errors",
+			args: func() args {
+				return args{id: UserID{}, username: "", password: ""}
+			},
 			expectedErr: v.Errors{
 				"id":       v.ErrRequired,
 				"password": v.ErrRequired,
@@ -101,7 +146,8 @@ func TestNewUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			u, err := NewUser(tt.id, tt.userName, tt.password, envx.Test)
+			a := tt.args()
+			u, err := NewUser(a.id, a.username, a.password, envx.Test)
 			if tt.expectedErr != nil {
 				vx.AssertValidationErrors(t, err, tt.expectedErr)
 				return
@@ -109,9 +155,9 @@ func TestNewUser(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, u)
-			assert.Equal(t, tt.id, u.id)
-			assert.Equal(t, tt.userName, u.name)
-			assert.NoError(t, u.ComparePassword(tt.password), "password should verify against hash")
+			assert.Equal(t, a.id, u.id)
+			assert.Equal(t, a.username, u.name)
+			assert.NoError(t, u.ComparePassword(a.password), "password should verify against hash")
 		})
 	}
 }

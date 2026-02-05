@@ -1,7 +1,6 @@
 package vx
 
 import (
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"reflect"
@@ -15,14 +14,20 @@ import (
 
 var ErrInvalidPasswordFormat = v.NewError(i18nx.ValidationInvalidPasswordFormat, i18nx.ValidationInvalidPasswordFormatMessage)
 
-var (
-	IsPasswordFromat = PasswordFormatRule{}
-	Required         = RequiredRule{}
-)
+var Required = RequiredRule{}
 
-var valuerType = reflect.TypeOf((*driver.Valuer)(nil)).Elem()
+func Password(minLen, maxLen int) PasswordFormatRule {
+	return PasswordFormatRule{
+		min: minLen,
+		max: maxLen,
+		err: ErrInvalidPasswordFormat.SetParams(map[string]any{i18nx.PhMin: minLen, i18nx.PhMax: maxLen}),
+	}
+}
 
-type PasswordFormatRule struct{}
+type PasswordFormatRule struct {
+	min, max int
+	err      v.Error
+}
 
 // Validate validates a password string against the defined rules.
 // It checks for minimum length, presence of uppercase, lowercase, digit, and special character.
@@ -32,8 +37,8 @@ func (r PasswordFormatRule) Validate(value any) error {
 		return errors.New("value is not a string")
 	}
 
-	if len(password) < 8 {
-		return ErrInvalidPasswordFormat
+	if len(password) < r.min || len(password) > r.max {
+		return r.err
 	}
 
 	var hasLower, hasUpper, hasDigit, hasSpecial bool
@@ -49,12 +54,12 @@ func (r PasswordFormatRule) Validate(value any) error {
 		case unicode.IsPunct(char) || unicode.IsSymbol(char):
 			hasSpecial = true
 		default:
-			return ErrInvalidPasswordFormat
+			return r.err
 		}
 	}
 
 	if !hasLower || !hasUpper || !hasDigit || !hasSpecial {
-		return ErrInvalidPasswordFormat
+		return r.err
 	}
 
 	return nil
@@ -119,13 +124,13 @@ func IsEmpty(value any) bool {
 // If the value is neither an interface nor a pointer, it will be returned back.
 //
 // From: https://github.com/ARUMANDESU/validation/blob/main/util.go#L134
-func Indirect(value interface{}) (interface{}, bool) {
+func Indirect(value any) (any, bool) {
 	rv := reflect.ValueOf(value)
 	kind := rv.Kind()
 	switch kind {
 	case reflect.Invalid:
 		return nil, true
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		if rv.IsNil() {
 			return nil, true
 		}

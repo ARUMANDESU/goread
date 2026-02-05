@@ -251,4 +251,4 @@ other = "must be a valid semantic version"
 # ---- custom validation rules ----
 
 [validation_invalid_password_format]
-other = "must contain at least 8 characters with uppercase, lowercase, number, and special character"
+other = "must contain {{.min}}–{{.max}} characters, including at least one uppercase letter, one lowercase letter, one number, and one special character"
