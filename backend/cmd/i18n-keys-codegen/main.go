@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -139,11 +140,13 @@ func run(ctx context.Context, w io.Writer, args []string) error {
 		var keysConstBuilder strings.Builder
 		var defaultMsgConstBuilder strings.Builder
 		placeholders := make(map[string]struct{})
+		slices.SortFunc(msgFile.Messages, func(a, b *i18n.Message) int { return strings.Compare(a.ID, b.ID) })
 		for _, msgs := range msgFile.Messages {
 			constName := toCamelCase(msgs.ID)
 			keysConstBuilder.WriteString(fmt.Sprintf("\t%s = \"%s\"\n", constName, msgs.ID))
 			defaultMsgConstBuilder.WriteString(fmt.Sprintf("\t%sMessage = \"%s\"\n", constName, msgs.Other))
 			p := getPlaceholders(msgs.Other)
+			slices.Sort(p)
 			for _, vv := range p {
 				placeholders[vv] = struct{}{}
 			}
