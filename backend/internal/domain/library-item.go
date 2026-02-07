@@ -24,6 +24,7 @@ const (
 	Comic LibraryItemType = "comic"
 )
 
+//go:generate go tool gobuildergen --type LibraryItem
 type LibraryItem struct {
 	id         LibraryItemID
 	title      string
@@ -32,6 +33,7 @@ type LibraryItem struct {
 	genre      []string
 	languages  []string
 	annotation string
+	path       string
 }
 
 func NewLibraryItemID() LibraryItemID {

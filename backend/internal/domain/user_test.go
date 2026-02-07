@@ -12,13 +12,6 @@ import (
 	vx "github.com/ARUMANDESU/goread/backend/pkg/validationx"
 )
 
-const (
-	ValidUsername         = "user1"
-	ValidPassword         = "examplePass123!@"
-	InvalidPasswordShort  = "sh12!@"
-	InvalidPasswordFormat = "OnlyABClol"
-)
-
 func TestNewUser(t *testing.T) {
 	t.Parallel()
 

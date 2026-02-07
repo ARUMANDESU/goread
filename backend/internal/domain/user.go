@@ -18,11 +18,19 @@ const (
 	MaxUserPasswordLen = 128
 )
 
+const (
+	ValidUsername         = "user1"
+	ValidPassword         = "examplePass123!@"
+	InvalidPasswordShort  = "sh12!@"
+	InvalidPasswordFormat = "OnlyABClol"
+)
+
 type UserID = uuid.UUID
 
+//go:generate go tool gobuildergen --type User
 type User struct {
-	id       UserID
-	name     string
+	id       UserID `builder:"default=NewUserID()"`
+	name     string `builder:"default=ValidUsername"`
 	passHash []byte
 }
 
