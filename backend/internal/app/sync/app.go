@@ -76,7 +76,7 @@ type (
 )
 
 type Scanner interface {
-	ScanDir(context.Context) map[Path]Hash
+	ScanDir(context.Context) (map[Path]Hash, error)
 }
 
 type LibraryRepo interface {
@@ -90,6 +90,6 @@ type App struct {
 
 func (a *App) ScanLibrary(ctx context.Context) error {
 	const op = errorx.Op("sync.App.ScanLibrary")
-	_ = a.Scanner.ScanDir(ctx)
+	_, _ = a.Scanner.ScanDir(ctx)
 	return nil
 }
