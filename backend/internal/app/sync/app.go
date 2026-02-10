@@ -99,7 +99,7 @@ func (a *App) ScanLibrary(ctx context.Context) error {
 	}
 
 	// TODO compare old and current snapshots to get diffs: added, removed, moved(removed+added)
-	_, _ = vo.CompareSnapshots(oldSnapshot, snapshot)
+	resuls := vo.CompareSnapshots(oldSnapshot, snapshot)
 
 	// get metadata for for added library items
 
