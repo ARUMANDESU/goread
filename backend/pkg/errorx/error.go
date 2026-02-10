@@ -1,6 +1,9 @@
 package errorx
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Op is operation. This should be used in every function that returns error, in order to build function call trace.
 type Op string
@@ -37,4 +40,42 @@ func (op Op) Msg(msg string) error {
 // Msgf wraps message(format + args) with op and returns error: <op>: <msg(f+args)>
 func (op Op) Msgf(f string, args ...any) error {
 	return fmt.Errorf("%s: %s", op, fmt.Sprintf(f, args...))
+}
+
+type Errors []error
+
+func (e *Errors) Append(err error) {
+	*e = append(*e, err)
+}
+
+func (e *Errors) Filter() error {
+	if e == nil || len(*e) == 0 {
+		return nil
+	}
+
+	var n int
+	for _, err := range *e {
+		if err != nil {
+			(*e)[n] = err
+			n++
+		}
+	}
+
+	*e = (*e)[:n]
+	if len(*e) == 0 {
+		return nil
+	}
+
+	return e
+}
+
+func (e *Errors) Error() string {
+	b := strings.Builder{}
+	for i, err := range *e {
+		b.WriteString(err.Error())
+		if i != len(*e)-1 {
+			b.WriteString(", ")
+		}
+	}
+	return b.String()
 }
