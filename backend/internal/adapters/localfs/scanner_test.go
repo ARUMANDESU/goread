@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sync_app "github.com/ARUMANDESU/goread/backend/internal/app/sync"
+	vo "github.com/ARUMANDESU/goread/backend/internal/domain/value-object"
 )
 
 func TestScanner_ScanDir(t *testing.T) {
@@ -17,7 +17,7 @@ func TestScanner_ScanDir(t *testing.T) {
 	tests := []struct {
 		name     string
 		fs       fstest.MapFS
-		expected map[sync_app.Path]sync_app.Hash
+		expected vo.LibrarySnapshot
 	}{
 		{
 			name: "multiple file types in nested dirs",
@@ -27,7 +27,7 @@ func TestScanner_ScanDir(t *testing.T) {
 				"comics/comic1/comic1.cbz": &fstest.MapFile{Data: []byte("comic 1")},
 				"manga/manga1/manga.cbr":   &fstest.MapFile{Data: []byte("manga 1")},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"books/book1/book1.epub":   getDataHash([]byte("book 1")),
 				"books/book2/book2.epub":   getDataHash([]byte("book 2")),
 				"comics/comic1/comic1.cbz": getDataHash([]byte("comic 1")),
@@ -39,21 +39,21 @@ func TestScanner_ScanDir(t *testing.T) {
 			fs: fstest.MapFS{
 				"book.epub": &fstest.MapFile{Data: []byte("data")},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"book.epub": getDataHash([]byte("data")),
 			},
 		},
 		{
 			name:     "empty fs",
 			fs:       fstest.MapFS{},
-			expected: map[sync_app.Path]sync_app.Hash{},
+			expected: vo.LibrarySnapshot{},
 		},
 		{
 			name: "deeply nested structure",
 			fs: fstest.MapFS{
 				"a/b/c/d/deep.epub": &fstest.MapFile{Data: []byte("deep")},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"a/b/c/d/deep.epub": getDataHash([]byte("deep")),
 			},
 		},
@@ -63,7 +63,7 @@ func TestScanner_ScanDir(t *testing.T) {
 				"a.epub": &fstest.MapFile{Data: []byte("same")},
 				"b.epub": &fstest.MapFile{Data: []byte("same")},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"a.epub": getDataHash([]byte("same")),
 				"b.epub": getDataHash([]byte("same")),
 			},
@@ -74,7 +74,7 @@ func TestScanner_ScanDir(t *testing.T) {
 				"a.epub": &fstest.MapFile{Data: []byte("content a")},
 				"b.epub": &fstest.MapFile{Data: []byte("content b")},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"a.epub": getDataHash([]byte("content a")),
 				"b.epub": getDataHash([]byte("content b")),
 			},
@@ -84,7 +84,7 @@ func TestScanner_ScanDir(t *testing.T) {
 			fs: fstest.MapFS{
 				"empty.epub": &fstest.MapFile{Data: []byte{}},
 			},
-			expected: map[sync_app.Path]sync_app.Hash{
+			expected: vo.LibrarySnapshot{
 				"empty.epub": getDataHash([]byte{}),
 			},
 		},
@@ -95,7 +95,7 @@ func TestScanner_ScanDir(t *testing.T) {
 			t.Parallel()
 			s := Scanner{fs: tt.fs}
 
-			res, err := s.ScanDir(t.Context())
+			res, err := s.Snapshot(t.Context())
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, res)
 		})

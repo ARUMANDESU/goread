@@ -2,6 +2,7 @@ package sync_app
 
 import (
 	"context"
+	"log/slog"
 
 	vo "github.com/ARUMANDESU/goread/backend/internal/domain/value-object"
 	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
@@ -70,26 +71,42 @@ Books
 // but this is too complex may we should we Merkle tree?
 // or just map[path]hash
 
-type (
-	Path = string
-	Hash = []byte
-)
-
-type Scanner interface {
-	ScanDir(context.Context) (map[Path]Hash, error)
+type Snapshotter interface {
+	Snapshot(context.Context) (vo.LibrarySnapshot, error)
 }
 
-type LibraryRepo interface {
-	GetLibrary(context.Context) vo.Library
+type SnapshotRepo interface {
+	GetLibrarySnapshot(context.Context) (vo.LibrarySnapshot, error)
 }
 
 type App struct {
-	Scanner     Scanner
-	LibraryRepo LibraryRepo
+	Snapshotter  Snapshotter
+	SnapshotRepo SnapshotRepo
 }
 
 func (a *App) ScanLibrary(ctx context.Context) error {
 	const op = errorx.Op("sync.App.ScanLibrary")
-	_, _ = a.Scanner.ScanDir(ctx)
+	snapshot, err := a.Snapshotter.Snapshot(ctx)
+	if err != nil && len(snapshot) == 0 {
+		return op.Wrap(err)
+	} else if err != nil {
+		slog.ErrorContext(ctx, op.Wrap(err).Error())
+	}
+
+	oldSnapshot, err := a.SnapshotRepo.GetLibrarySnapshot(ctx)
+	if err != nil {
+		return op.Wrap(err)
+	}
+
+	// TODO compare old and current snapshots to get diffs: added, removed, moved(removed+added)
+	_, _ = vo.CompareSnapshots(oldSnapshot, snapshot)
+
+	// get metadata for for added library items
+
+	// get authors
+
+	// save new library items and authors
+	// update library items to deleted which where removed
+	// update library items' file path for moved ones
 	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/ARUMANDESU/goread/backend/internal/app/sync"
+	vo "github.com/ARUMANDESU/goread/backend/internal/domain/value-object"
 	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
 )
 
@@ -19,10 +19,10 @@ func NewScanner(path string) Scanner {
 	return Scanner{fs: os.DirFS(path)}
 }
 
-func (s Scanner) ScanDir(ctx context.Context) (map[sync_app.Path]sync_app.Hash, error) {
-	const op = errorx.Op("localfs.Scanner.ScanDir")
+func (s Scanner) Snapshot(ctx context.Context) (vo.LibrarySnapshot, error) {
+	const op = errorx.Op("localfs.Scanner.Snapshot")
 
-	m := make(map[sync_app.Path]sync_app.Hash)
+	m := make(vo.LibrarySnapshot)
 	var errs errorx.Errors
 
 	err := fs.WalkDir(s.fs, ".", func(path string, d fs.DirEntry, err error) error {
