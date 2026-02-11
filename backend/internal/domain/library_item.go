@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	v "github.com/ARUMANDESU/validation"
 	"github.com/gofrs/uuid"
 
@@ -34,6 +36,8 @@ type LibraryItem struct {
 	languages  []string
 	annotation string
 	path       string
+	hash       []byte
+	deletedAt  *time.Time
 }
 
 func NewLibraryItemID() LibraryItemID {
@@ -48,6 +52,8 @@ func NewLibraryItem(
 	genre []string,
 	languages []string,
 	annotation string,
+	path string,
+	hash []byte,
 ) (*LibraryItem, error) {
 	const op = errorx.Op("domain.NewLibraryItem")
 	err := v.Errors{
@@ -71,5 +77,20 @@ func NewLibraryItem(
 		genre:      genre,
 		languages:  languages,
 		annotation: annotation,
+		path:       path,
+		hash:       hash,
 	}, nil
+}
+
+func (l *LibraryItem) UpdatePath(path string) {
+	l.path = path
+}
+
+func (l *LibraryItem) Delete() {
+	now := time.Now()
+	l.deletedAt = &now
+}
+
+func (l *LibraryItem) Hash() []byte {
+	return l.hash
 }

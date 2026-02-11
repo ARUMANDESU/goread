@@ -1,8 +1,9 @@
 package vo
 
 type (
-	Path = string
-	Hash = []byte
+	Path    = string
+	Hash    = []byte
+	HashStr = string
 )
 
 type LibrarySnapshot map[Path]Hash
@@ -14,37 +15,32 @@ type FileInfo struct {
 }
 
 type CompareSnapshotsResult struct {
-	Added   []FileInfo
-	Removed []FileInfo
-	Moved   []FileInfo
+	Added   map[HashStr]FileInfo
+	Removed map[HashStr]FileInfo
+	Moved   map[HashStr]FileInfo
 }
 
 func CompareSnapshots(old, curr LibrarySnapshot) CompareSnapshotsResult {
-	var added []FileInfo
-	var moved []FileInfo
-	removedMap := make(map[string]FileInfo)
+	added := make(map[HashStr]FileInfo)
+	moved := make(map[HashStr]FileInfo)
+	removed := make(map[HashStr]FileInfo)
 
 	for path, oldHash := range old {
 		if _, ok := curr[path]; !ok {
-			removedMap[string(oldHash)] = FileInfo{Hash: oldHash, Path: path}
+			removed[string(oldHash)] = FileInfo{Hash: oldHash, Path: path}
 		}
 	}
 
 	for path, currHash := range curr {
 		if _, ok := old[path]; !ok {
-			if file, ok := removedMap[string(currHash)]; ok {
+			if file, ok := removed[string(currHash)]; ok {
 				file.NewPath = path
-				moved = append(moved, file)
-				delete(removedMap, string(currHash))
+				moved[string(currHash)] = file
+				delete(removed, string(currHash))
 				continue
 			}
-			added = append(added, FileInfo{Hash: currHash, Path: path})
+			added[string(currHash)] = FileInfo{Hash: currHash, Path: path}
 		}
-	}
-
-	removed := make([]FileInfo, 0, len(removedMap))
-	for _, file := range removedMap {
-		removed = append(removed, file)
 	}
 
 	return CompareSnapshotsResult{

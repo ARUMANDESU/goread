@@ -42,3 +42,11 @@ func NewAuthor(
 		name: name,
 	}, nil
 }
+
+func (a *Author) ID() AuthorID {
+	return a.id
+}
+
+func (a *Author) Name() string {
+	return a.name
+}

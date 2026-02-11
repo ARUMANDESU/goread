@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/ARUMANDESU/goread/backend/internal/domain"
 	vo "github.com/ARUMANDESU/goread/backend/internal/domain/value-object"
+	"github.com/ARUMANDESU/goread/backend/pkg/dbx"
 	"github.com/ARUMANDESU/goread/backend/pkg/errorx"
 )
 
@@ -75,13 +77,32 @@ type Snapshotter interface {
 	Snapshot(context.Context) (vo.LibrarySnapshot, error)
 }
 
+type MetadataExtractor interface {
+	Extract(context.Context, []vo.Path) (map[vo.Path]vo.Metadata, error)
+}
+
 type SnapshotRepo interface {
 	GetLibrarySnapshot(context.Context) (vo.LibrarySnapshot, error)
+	ReplaceSnapshot(context.Context, vo.LibrarySnapshot) error
+}
+
+type AuthorRepo interface {
+	GetOrCreateAuthors(ctx context.Context, names []string) ([]domain.Author, error)
+}
+
+type LibraryItemRepo interface {
+	CreateLibraryItems(context.Context, []*domain.LibraryItem) error
+	GetLibraryItemsByHash(context.Context, []vo.Hash) ([]*domain.LibraryItem, error)
+	UpdateLibraryItems(context.Context, []*domain.LibraryItem) error
 }
 
 type App struct {
-	Snapshotter  Snapshotter
-	SnapshotRepo SnapshotRepo
+	Session           dbx.Session
+	Snapshotter       Snapshotter
+	MetadataExtractor MetadataExtractor
+	SnapshotRepo      SnapshotRepo
+	LibraryItemRepo   LibraryItemRepo
+	AuthorRepo        AuthorRepo
 }
 
 func (a *App) ScanLibrary(ctx context.Context) error {
@@ -98,15 +119,104 @@ func (a *App) ScanLibrary(ctx context.Context) error {
 		return op.Wrap(err)
 	}
 
-	// TODO compare old and current snapshots to get diffs: added, removed, moved(removed+added)
-	resuls := vo.CompareSnapshots(oldSnapshot, snapshot)
+	results := vo.CompareSnapshots(oldSnapshot, snapshot)
 
-	// get metadata for for added library items
+	addedPaths := make([]string, 0, len(results.Added))
+	for _, v := range results.Added {
+		addedPaths = append(addedPaths, v.Path)
+	}
 
-	// get authors
+	metadataMap, err := a.MetadataExtractor.Extract(ctx, addedPaths)
+	if err != nil {
+		return op.Wrap(err)
+	}
 
-	// save new library items and authors
-	// update library items to deleted which where removed
-	// update library items' file path for moved ones
-	return nil
+	uniqueNames := make(map[string]struct{})
+	for _, md := range metadataMap {
+		for _, name := range md.Authors {
+			uniqueNames[name] = struct{}{}
+		}
+	}
+
+	names := make([]string, 0, len(uniqueNames))
+	for name := range uniqueNames {
+		names = append(names, name)
+	}
+
+	return a.Session.Transaction(ctx, func(ctx context.Context) error {
+		authors, err := a.AuthorRepo.GetOrCreateAuthors(ctx, names)
+		if err != nil {
+			return op.Wrap(err)
+		}
+
+		authorByName := make(map[string]domain.AuthorID, len(authors))
+		for _, author := range authors {
+			authorByName[author.Name()] = author.ID()
+		}
+
+		libraryItems := make([]*domain.LibraryItem, 0, len(metadataMap))
+		for path, md := range metadataMap {
+			ids := make([]domain.AuthorID, len(md.Authors))
+			for i, name := range md.Authors {
+				ids[i] = authorByName[name]
+			}
+
+			item, err := domain.NewLibraryItem(
+				domain.NewLibraryItemID(),
+				md.Title,
+				domain.Book, // TODO parse properly
+				ids,
+				md.Subjects,
+				md.Languages,
+				md.Description,
+				path,
+				snapshot[path],
+			)
+			if err != nil {
+				slog.WarnContext(ctx, "skipping item", "path", path, "error", err)
+				delete(snapshot, path)
+				continue
+			}
+			libraryItems = append(libraryItems, item)
+		}
+
+		err = a.LibraryItemRepo.CreateLibraryItems(ctx, libraryItems)
+		if err != nil {
+			return op.Wrap(err)
+		}
+
+		hashes := make([]vo.Hash, 0, len(results.Moved)+len(results.Removed))
+		for _, v := range results.Moved {
+			hashes = append(hashes, v.Hash)
+		}
+		for _, v := range results.Removed {
+			hashes = append(hashes, v.Hash)
+		}
+
+		libraryItems, err = a.LibraryItemRepo.GetLibraryItemsByHash(ctx, hashes)
+		if err != nil {
+			return op.Wrap(err)
+		}
+
+		for _, item := range libraryItems {
+			if _, ok := results.Removed[string(item.Hash())]; ok {
+				item.Delete()
+			}
+			if f, ok := results.Moved[string(item.Hash())]; ok {
+				item.UpdatePath(f.NewPath)
+			}
+		}
+
+		err = a.LibraryItemRepo.UpdateLibraryItems(ctx, libraryItems)
+		if err != nil {
+			return op.Wrap(err)
+		}
+
+		err = a.SnapshotRepo.ReplaceSnapshot(ctx, snapshot)
+		if err != nil {
+			return op.Wrap(err)
+		}
+
+		return nil
+	})
 }

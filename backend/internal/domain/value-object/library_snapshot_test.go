@@ -19,20 +19,22 @@ func TestCompareSnapshots(t *testing.T) {
 			name:     "both empty",
 			old:      LibrarySnapshot{},
 			curr:     LibrarySnapshot{},
-			expected: CompareSnapshotsResult{},
+			expected: CompareSnapshotsResult{Added: map[HashStr]FileInfo{}, Removed: map[HashStr]FileInfo{}, Moved: map[HashStr]FileInfo{}},
 		},
 		{
-			name: "no changes",
-			old:  LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2")},
-			curr: LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2")},
-			expected: CompareSnapshotsResult{},
+			name:     "no changes",
+			old:      LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2")},
+			curr:     LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2")},
+			expected: CompareSnapshotsResult{Added: map[HashStr]FileInfo{}, Removed: map[HashStr]FileInfo{}, Moved: map[HashStr]FileInfo{}},
 		},
 		{
 			name: "file added",
 			old:  LibrarySnapshot{},
 			curr: LibrarySnapshot{"a.epub": []byte("h1")},
 			expected: CompareSnapshotsResult{
-				Added: []FileInfo{{Hash: []byte("h1"), Path: "a.epub"}},
+				Added:   map[HashStr]FileInfo{"h1": {Hash: []byte("h1"), Path: "a.epub"}},
+				Removed: map[HashStr]FileInfo{},
+				Moved:   map[HashStr]FileInfo{},
 			},
 		},
 		{
@@ -40,10 +42,12 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"a.epub": []byte("h1")},
 			curr: LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2"), "c.epub": []byte("h3")},
 			expected: CompareSnapshotsResult{
-				Added: []FileInfo{
-					{Hash: []byte("h2"), Path: "b.epub"},
-					{Hash: []byte("h3"), Path: "c.epub"},
+				Added: map[HashStr]FileInfo{
+					"h2": {Hash: []byte("h2"), Path: "b.epub"},
+					"h3": {Hash: []byte("h3"), Path: "c.epub"},
 				},
+				Removed: map[HashStr]FileInfo{},
+				Moved:   map[HashStr]FileInfo{},
 			},
 		},
 		{
@@ -51,7 +55,9 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"a.epub": []byte("h1")},
 			curr: LibrarySnapshot{},
 			expected: CompareSnapshotsResult{
-				Removed: []FileInfo{{Hash: []byte("h1"), Path: "a.epub"}},
+				Added:   map[HashStr]FileInfo{},
+				Removed: map[HashStr]FileInfo{"h1": {Hash: []byte("h1"), Path: "a.epub"}},
+				Moved:   map[HashStr]FileInfo{},
 			},
 		},
 		{
@@ -59,10 +65,12 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2"), "c.epub": []byte("h3")},
 			curr: LibrarySnapshot{"a.epub": []byte("h1")},
 			expected: CompareSnapshotsResult{
-				Removed: []FileInfo{
-					{Hash: []byte("h2"), Path: "b.epub"},
-					{Hash: []byte("h3"), Path: "c.epub"},
+				Added: map[HashStr]FileInfo{},
+				Removed: map[HashStr]FileInfo{
+					"h2": {Hash: []byte("h2"), Path: "b.epub"},
+					"h3": {Hash: []byte("h3"), Path: "c.epub"},
 				},
+				Moved: map[HashStr]FileInfo{},
 			},
 		},
 		{
@@ -70,7 +78,9 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"old/a.epub": []byte("h1")},
 			curr: LibrarySnapshot{"new/a.epub": []byte("h1")},
 			expected: CompareSnapshotsResult{
-				Moved: []FileInfo{{Hash: []byte("h1"), Path: "old/a.epub", NewPath: "new/a.epub"}},
+				Added:   map[HashStr]FileInfo{},
+				Removed: map[HashStr]FileInfo{},
+				Moved:   map[HashStr]FileInfo{"h1": {Hash: []byte("h1"), Path: "old/a.epub", NewPath: "new/a.epub"}},
 			},
 		},
 		{
@@ -78,8 +88,9 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"a.epub": []byte("h1")},
 			curr: LibrarySnapshot{"b.epub": []byte("h2")},
 			expected: CompareSnapshotsResult{
-				Added:   []FileInfo{{Hash: []byte("h2"), Path: "b.epub"}},
-				Removed: []FileInfo{{Hash: []byte("h1"), Path: "a.epub"}},
+				Added:   map[HashStr]FileInfo{"h2": {Hash: []byte("h2"), Path: "b.epub"}},
+				Removed: map[HashStr]FileInfo{"h1": {Hash: []byte("h1"), Path: "a.epub"}},
+				Moved:   map[HashStr]FileInfo{},
 			},
 		},
 		{
@@ -87,16 +98,16 @@ func TestCompareSnapshots(t *testing.T) {
 			old:  LibrarySnapshot{"a.epub": []byte("h1"), "b.epub": []byte("h2"), "c.epub": []byte("h3")},
 			curr: LibrarySnapshot{"a.epub": []byte("h1"), "d.epub": []byte("h2"), "e.epub": []byte("h4")},
 			expected: CompareSnapshotsResult{
-				Added:   []FileInfo{{Hash: []byte("h4"), Path: "e.epub"}},
-				Removed: []FileInfo{{Hash: []byte("h3"), Path: "c.epub"}},
-				Moved:   []FileInfo{{Hash: []byte("h2"), Path: "b.epub", NewPath: "d.epub"}},
+				Added:   map[HashStr]FileInfo{"h4": {Hash: []byte("h4"), Path: "e.epub"}},
+				Removed: map[HashStr]FileInfo{"h3": {Hash: []byte("h3"), Path: "c.epub"}},
+				Moved:   map[HashStr]FileInfo{"h2": {Hash: []byte("h2"), Path: "b.epub", NewPath: "d.epub"}},
 			},
 		},
 		{
-			name: "content changed at same path",
-			old:  LibrarySnapshot{"a.epub": []byte("h1")},
-			curr: LibrarySnapshot{"a.epub": []byte("h2")},
-			expected: CompareSnapshotsResult{},
+			name:     "content changed at same path",
+			old:      LibrarySnapshot{"a.epub": []byte("h1")},
+			curr:     LibrarySnapshot{"a.epub": []byte("h2")},
+			expected: CompareSnapshotsResult{Added: map[HashStr]FileInfo{}, Removed: map[HashStr]FileInfo{}, Moved: map[HashStr]FileInfo{}},
 		},
 	}
 
@@ -106,9 +117,9 @@ func TestCompareSnapshots(t *testing.T) {
 
 			result := CompareSnapshots(tt.old, tt.curr)
 
-			assert.ElementsMatch(t, tt.expected.Added, result.Added, "Added mismatch")
-			assert.ElementsMatch(t, tt.expected.Removed, result.Removed, "Removed mismatch")
-			assert.ElementsMatch(t, tt.expected.Moved, result.Moved, "Moved mismatch")
+			assert.Equal(t, tt.expected.Added, result.Added, "Added mismatch")
+			assert.Equal(t, tt.expected.Removed, result.Removed, "Removed mismatch")
+			assert.Equal(t, tt.expected.Moved, result.Moved, "Moved mismatch")
 		})
 	}
 }
