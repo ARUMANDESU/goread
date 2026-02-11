@@ -70,19 +70,29 @@ func zipWithFile(t *testing.T, name string, data []byte) *zip.File {
 	return r.File[0]
 }
 
-// buildEPUBZip creates an in-memory zip with the given files and returns a *bytes.Reader + size.
-func buildEPUBZip(t *testing.T, files map[string][]byte) *bytes.Reader {
+// buildEPUBZip creates an in-memory zip with the given ordered files and returns a *bytes.Reader.
+// Files are written in the order provided. The mimetype entry uses zip.Store (uncompressed) per EPUB spec.
+func buildEPUBZip(t *testing.T, files ...zipEntry) *bytes.Reader {
 	t.Helper()
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)
-	for name, data := range files {
-		fw, err := w.Create(name)
+	for _, f := range files {
+		method := zip.Deflate
+		if f.name == "mimetype" {
+			method = zip.Store
+		}
+		fw, err := w.CreateHeader(&zip.FileHeader{Name: f.name, Method: method})
 		require.NoError(t, err)
-		_, err = fw.Write(data)
+		_, err = fw.Write(f.data)
 		require.NoError(t, err)
 	}
 	require.NoError(t, w.Close())
 	return bytes.NewReader(buf.Bytes())
+}
+
+type zipEntry struct {
+	name string
+	data []byte
 }
 
 var (
@@ -116,45 +126,62 @@ func TestParseEPUB_errors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		files   map[string][]byte
+		files   []zipEntry
 		wantErr error
 	}{
 		{
 			name:    "missing container.xml",
-			files:   map[string][]byte{"mimetype": validMimetype},
+			files:   []zipEntry{{name: "mimetype", data: validMimetype}},
 			wantErr: ErrMissingContainerXML,
 		},
 		{
 			name: "missing mimetype",
-			files: map[string][]byte{
-				"META-INF/container.xml": validContainer,
-				"content.opf":            minimalOPF,
+			files: []zipEntry{
+				{name: "META-INF/container.xml", data: validContainer},
+				{name: "content.opf", data: minimalOPF},
 			},
-			wantErr: ErrMissingMimetype,
+			wantErr: ErrMimetypeNotFirst,
 		},
 		{
-			name: "invalid mimetype",
-			files: map[string][]byte{
-				"META-INF/container.xml": validContainer,
-				"content.opf":            minimalOPF,
-				"mimetype":               []byte("text/plain"),
+			name: "mimetype not first file",
+			files: []zipEntry{
+				{name: "META-INF/container.xml", data: validContainer},
+				{name: "mimetype", data: validMimetype},
+				{name: "content.opf", data: minimalOPF},
+			},
+			wantErr: ErrMimetypeNotFirst,
+		},
+		{
+			name: "invalid mimetype content",
+			files: []zipEntry{
+				{name: "mimetype", data: []byte("text/plain")},
+				{name: "META-INF/container.xml", data: validContainer},
+				{name: "content.opf", data: minimalOPF},
 			},
 			wantErr: ErrInvalidMimetype,
 		},
 		{
 			name: "missing content.opf pointed by container",
-			files: map[string][]byte{
-				"META-INF/container.xml": nestedOPFContainer("OEBPS/package.opf"),
-				"mimetype":               validMimetype,
+			files: []zipEntry{
+				{name: "mimetype", data: validMimetype},
+				{name: "META-INF/container.xml", data: nestedOPFContainer("OEBPS/package.opf")},
 			},
 			wantErr: ErrMissingContentOPF,
+		},
+		{
+			name: "container.xml with empty rootfile path",
+			files: []zipEntry{
+				{name: "mimetype", data: validMimetype},
+				{name: "META-INF/container.xml", data: nestedOPFContainer("")},
+			},
+			wantErr: ErrMissingRootFilePath,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := buildEPUBZip(t, tt.files)
+			r := buildEPUBZip(t, tt.files...)
 			_, err := ParseEPUB(r, int64(r.Len()))
 			require.ErrorIs(t, err, tt.wantErr)
 		})
@@ -176,11 +203,11 @@ func TestParseEPUB_nestedOPFPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := buildEPUBZip(t, map[string][]byte{
-				"META-INF/container.xml": nestedOPFContainer(tt.opfPath),
-				"mimetype":               validMimetype,
-				tt.opfPath:               minimalOPF,
-			})
+			r := buildEPUBZip(t,
+				zipEntry{name: "mimetype", data: validMimetype},
+				zipEntry{name: "META-INF/container.xml", data: nestedOPFContainer(tt.opfPath)},
+				zipEntry{name: tt.opfPath, data: minimalOPF},
+			)
 
 			epub, err := ParseEPUB(r, int64(r.Len()))
 			require.NoError(t, err)
@@ -229,7 +256,16 @@ func Test_parseContainer(t *testing.T) {
       <rootfile full-path="" media-type="application/oebps-package+xml"/>
    </rootfiles>
 </container>`,
-			want: "",
+			wantErr: true,
+		},
+		{
+			name: "missing rootfile element",
+			xml: `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+   <rootfiles>
+   </rootfiles>
+</container>`,
+			wantErr: true,
 		},
 		{
 			name:    "invalid xml",

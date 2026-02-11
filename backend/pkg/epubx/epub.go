@@ -4,16 +4,23 @@ import (
 	"archive/zip"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 )
 
-const containerPath = "META-INF/container.xml"
+const (
+	containerPath    = "META-INF/container.xml"
+	expectedMimetype = "application/epub+zip"
+)
 
 var (
 	ErrInvalidMimetype     = errors.New("invalid mime type")
 	ErrMissingMimetype     = errors.New("missing mimetype")
 	ErrMissingContentOPF   = errors.New("missing content.opf")
 	ErrMissingContainerXML = errors.New("missing container.xml")
+	ErrMissingRootFilePath = errors.New("container.xml missing rootfile path")
+	ErrMimetypeNotFirst    = errors.New("mimetype must be first file")
+	ErrMimetypeCompressed  = errors.New("mimetype must be uncompressed")
 )
 
 // Package represents the root of the .opf file
@@ -70,21 +77,27 @@ func ParseEPUB(r io.ReaderAt, size int64) (EPUB, error) {
 		return EPUB{}, err
 	}
 
+	if len(zr.File) > 0 && zr.File[0].Name != "mimetype" {
+		return EPUB{}, ErrMimetypeNotFirst
+	}
+
 	fileMap := make(map[string]*zip.File, len(zr.File))
 	for _, zfile := range zr.File {
 		fileMap[zfile.Name] = zfile
 	}
 
 	if fileMap[containerPath] == nil {
-		return EPUB{}, ErrMissingContainerXML
+		return EPUB{}, fmt.Errorf("%w: %s", ErrMissingContainerXML, containerPath)
 	}
 
 	contentOPFFilePath, err := parseContainer(fileMap[containerPath])
 	if err != nil {
 		return EPUB{}, err
 	}
-	if fileMap["mimetype"] == nil {
+	if mf := fileMap["mimetype"]; mf == nil {
 		return EPUB{}, ErrMissingMimetype
+	} else if mf.Method != zip.Store {
+		return EPUB{}, ErrMimetypeCompressed
 	}
 	if fileMap[contentOPFFilePath] == nil {
 		return EPUB{}, ErrMissingContentOPF
@@ -96,11 +109,12 @@ func ParseEPUB(r io.ReaderAt, size int64) (EPUB, error) {
 	}
 	defer mr.Close()
 
-	mdata, err := io.ReadAll(mr)
-	if err != nil {
+	buf := make([]byte, len(expectedMimetype))
+	n, err := io.ReadFull(mr, buf)
+	if err != nil && err != io.ErrUnexpectedEOF {
 		return EPUB{}, err
 	}
-	if string(mdata) != "application/epub+zip" {
+	if n != len(expectedMimetype) || string(buf) != expectedMimetype {
 		return EPUB{}, ErrInvalidMimetype
 	}
 
@@ -135,6 +149,10 @@ func parseContainer(f *zip.File) (string, error) {
 	err = xml.NewDecoder(r).Decode(&container)
 	if err != nil {
 		return "", err
+	}
+
+	if container.ContentPath.FullPath == "" {
+		return "", ErrMissingRootFilePath
 	}
 
 	return container.ContentPath.FullPath, nil
